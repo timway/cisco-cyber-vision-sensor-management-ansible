@@ -78,7 +78,7 @@
 - name: Set filename for sensor app (active discovery)
   ansible.builtin.set_fact:
     sensor_app_filename: "cviox-active-discovery-{{ sensor_app_arch }}.tar"
-  when: 
+  when:
     - active_discovery_enabled is true and (active_discovery_interfaces | default([]) | length > 0)
   connection: local
 

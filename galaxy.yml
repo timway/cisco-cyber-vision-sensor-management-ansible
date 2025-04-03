@@ -1,0 +1,19 @@
+---
+namespace: cisco
+name: cybervision_sensor_management
+
+authors:
+  - Ethan Chesson <echesson@cisco.com>
+  - Etienne David <etdavid@cisco.com>
+description: >-
+  This collection contains a set of Ansible playbooks designed to automate the
+  deployment and configuration of Cisco Cyber Vision sensors across a variety
+  of Cisco network devices (switches and routers) at scale. Cisco Cyber Vision
+  provides visibility into your industrial control system (ICS) to ensure
+  security, continuity, and resilience of operations. The Ansible Playbooks
+  also configure the networking device with the appropriate configuration
+  needed to support the deployment of the Cyber Vision sensor.
+license_file: license.md
+readme: README.md
+repository: https://github.com/CiscoDevNet/cisco-cyber-vision-sensor-management-ansible
+version: 0.9.0

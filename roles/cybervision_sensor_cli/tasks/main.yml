@@ -60,24 +60,27 @@
       register: center_version_result
 
     - name: Register center version
-      ansible.builtin.set_fact: center_version_json="{{ center_version_result.json }}"
+      ansible.builtin.set_fact:
+        center_version_json: "{{ center_version_result.json }}"
       connection: local
 
     - name: Register center version
-      ansible.builtin.set_fact: center_version="{{ center_version_json.major }}.{{ center_version_json.minor }}.{{ center_version_json.incr }}"
+      ansible.builtin.set_fact:
+        center_version: "{{ center_version_json.major }}.{{ center_version_json.minor }}.{{ center_version_json.incr }}"
       connection: local
 
     - name: Check center version
       ansible.builtin.assert:
         that:
           - center_version is version('3.2.1', '>=')
-        fail_msg: Current Cyber Vision Center (CVC) version {{ center_version }} is lower than minimum requirement, please update CVC"
+        fail_msg: "Current Cyber Vision Center (CVC) version {{ center_version }} is lower than minimum requirement, please update CVC"
         success_msg: "Current Cyber Vision Center version {{ center_version }} meets minimum version requirements"
 
 - name: Verify Cyber Vision Sensor version
   block:
     - name: Register sensor version
-      ansible.builtin.set_fact: sensor_version="{{ package.info.version.split('+')[0] }}"
+      ansible.builtin.set_fact:
+        sensor_version: "{{ package.info.version.split('+')[0] }}"
       connection: local
 
     - name: Check sensor version
@@ -99,13 +102,9 @@
         serial_number: "{{ inventory.stdout | regex_findall('SN:\\s+(\\w+)') | default('Not found') }}"
 
     - name: Register serial number of the device
-      ansible.builtin.set_fact: serial="{{ serial_number[0] }}"
+      ansible.builtin.set_fact:
+        serial: "{{ serial_number[0] }}"
       connection: local
-
-- name: Get app status
-  ansible.builtin.set_fact: app_status="{{ app_list[1][1] }}"
-  connection: local
-  when: mode == 'update'
 
 - name: Set sensor ID
   block:
@@ -121,13 +120,15 @@
       register: sensor_list
 
     - name: Get sensor id
-      ansible.builtin.set_fact: sensor_id="{{ sensor_list.json | json_query(jmesquery) }}"
+      ansible.builtin.set_fact:
+        sensor_id: "{{ sensor_list.json | json_query(jmesquery) }}"
       connection: local
       vars:
         jmesquery: "[? serialNumber==`{{ serial }}`].id"
 
     - name: Default value for sensor id
-      ansible.builtin.set_fact: sensor_id="{{ sensor_id[0] if sensor_id != [] else '' }}"
+      ansible.builtin.set_fact:
+        sensor_id: "{{ sensor_id[0] if sensor_id != [] else '' }}"
       connection: local
 
 - name: Copy installation file to the host
@@ -144,7 +145,7 @@
     - name: Copy the application tar file to the device
       cisco.ios.ios_command:
         commands:
-          - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password }}@{{ ansible_controller_ip }}/{{ application_tar_path }} {{ storage }}"
+          - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password | urlencode }}@{{ ansible_controller_ip }}/{{ application_tar_path }} {{ storage }}"
             prompt: 'Destination filename \[{{ application_file[0] }}\]?'
             answer: "\r"
       vars:
@@ -177,14 +178,15 @@
 
 - name: Get the app name for update
   ansible.builtin.set_fact:
-    app_list: "{{ app_hosting_list.stdout_lines | regex_findall('(\\w+)\\s+(\\w+)',multiline=True) | default('No match found') }}"
+    app_list: "{{ app_hosting_list.stdout_lines | regex_findall('(\\w+)\\s+(\\w+)', multiline=True) | default('No match found') }}"
 
 - name: Print the app name
   ansible.builtin.debug:
     msg: "The app name is {{ app_list }}"
 
 - name: Get app status
-  ansible.builtin.set_fact: app_status="{{ app_list[1][1] }}"
+  ansible.builtin.set_fact:
+    app_status: "{{ app_list[1][1] }}"
   connection: local
 
 - name: Check if sensor exists
@@ -198,14 +200,16 @@
     body_format: json
   register: sensor_list
 
-- name: get sensor id
-  ansible.builtin.set_fact: sensor_id="{{ sensor_list.json | json_query(jmesquery) }}"
+- name: Get sensor id
+  ansible.builtin.set_fact:
+    sensor_id: "{{ sensor_list.json | json_query(jmesquery) }}"
   connection: local
   vars:
     jmesquery: "[? serialNumber==`{{ serial }}`].id"
 
-- name: default value for sensor id
-  ansible.builtin.set_fact: sensor_id="{{ sensor_id[0] if sensor_id != [] else '' }}"
+- name: Default value for sensor id
+  ansible.builtin.set_fact:
+    sensor_id: "{{ sensor_id[0] if sensor_id != [] else '' }}"
   connection: local
 
 - name: Check sensor status
@@ -219,8 +223,9 @@
     body_format: json
   register: sensor_list
 
-- name: get enrollment status
-  ansible.builtin.set_fact: enrollment_status="{{ sensor_list.json | json_query(jmesquery) }}"
+- name: Get enrollment status
+  ansible.builtin.set_fact:
+    enrollment_status: "{{ sensor_list.json | json_query(jmesquery) }}"
   connection: local
   vars:
     jmesquery: "[? serialNumber==`{{ serial }}`].status.enrollmentStatus"
@@ -245,8 +250,9 @@
   register: sensor_list
   when: check_sensor_status is defined and check_sensor_status
 
-- name: get sensor status
-  ansible.builtin.set_fact: sensor_status="{{ sensor_list.json | json_query(jmesquery) }}"
+- name: Get sensor status
+  ansible.builtin.set_fact:
+    sensor_status: "{{ sensor_list.json | json_query(jmesquery) }}"
   connection: local
   vars:
     jmesquery: "[? serialNumber==`{{ serial }}`].status.operationalStatus"

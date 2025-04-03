@@ -8,13 +8,13 @@
   ansible.builtin.debug:
     msg: "{{ storage_data.stdout }}"
 
-- name: set_fact SSD is present (IRs)
+- name: Set_fact SSD is present (IRs)
   ansible.builtin.set_fact:
     has_ssd: true
   when:
     - "storage_data.stdout[0] == 'SSD is present'"
 
-- name: set_fact SSD is not present (IRs)
+- name: Set_fact SSD is not present (IRs)
   ansible.builtin.set_fact:
     has_ssd: false
   when:

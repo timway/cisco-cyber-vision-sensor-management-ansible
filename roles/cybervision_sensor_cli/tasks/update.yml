@@ -24,7 +24,7 @@
     - name: Pause for 30 seconds to upgrade the app
       ansible.builtin.pause:
         seconds: 30
-    
+
     - name: Assert app is running
       cisco.ios.ios_command:
         commands: "show app-hosting list"
@@ -32,7 +32,6 @@
       until: "'RUNNING' in app_list.stdout_lines[0][2]"
       retries: 20
       delay: 5
-
   rescue:
     - name: Set log time window variable (minutes)
       ansible.builtin.set_fact:
@@ -45,7 +44,7 @@
 
     - name: Filter recent log entries
       ansible.builtin.set_fact:
-        recent_app_hosting_logs: "{{ app_hosting_logs.stdout_lines[0] | filter_recent_logs(log_time_window) }}"
+        recent_app_hosting_logs: "{{ app_hosting_logs.stdout_lines[0] | cisco.cybervision_sensor_management.filter_recent_logs(log_time_window) }}"
 
     - name: Assert upgrade did not fail
       ansible.builtin.assert:

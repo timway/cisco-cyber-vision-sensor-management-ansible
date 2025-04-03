@@ -1,3 +1,4 @@
+---
 check_sensor_and_center_version: true
 check_sensor_status: true
 ztp_deployment: false

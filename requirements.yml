@@ -1,0 +1,6 @@
+---
+collections:
+  - name: cisco.ios
+    version: ">=9.2.0"
+  - name: community.general
+    version: ">=10.5.0"

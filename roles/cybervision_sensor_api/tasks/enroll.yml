@@ -8,12 +8,14 @@
   notify: "Remove provisioning temporary directory"
 
 - name: Set sensor name used in Center
-  ansible.builtin.set_fact: 
+  ansible.builtin.set_fact:
     sensor_name: "{{ sensor_name | default('', true) }}"
   connection: local
 
 - name: Sensor (Non IC3000)
   connection: local
+  when:
+    - "'IC3000' not in group_names"
   block:
     - name: Get sensor id (non IC3000)
       block:
@@ -29,8 +31,9 @@
             body: "{{ lookup('template', 'create_sensor.json.j2') }}"
           register: sensor_creation_result
 
-        - name: register sensor id
-          ansible.builtin.set_fact: sensor_id="{{ sensor_creation_result['json']['Id'] }}"
+        - name: Register sensor id
+          ansible.builtin.set_fact:
+            sensor_id: "{{ sensor_creation_result['json']['Id'] }}"
 
     - name: Get sensor provisioning
       ansible.builtin.uri:
@@ -52,16 +55,19 @@
           X-Token-Id: "{{ auth_token }}"
         status_code: 201
         src: '{{ sensor_provisioning_temp_dir.path }}/sbs-sensor-config-{{ sensor_serial }}.zip'
-  when: "'IC3000' not in group_names"
 
 - name: Sensor (IC3000)
   connection: local
+  when:
+    - "'IC3000' in group_names"
   block:
     - name: Set model for sensor creation (IC3000)
-      set_fact: 
+      ansible.builtin.set_fact:
         model: "{{ 'ic3000' if package.info.version <= '4.2.6' else 'iox' }}"
 
     - name: Get sensor id (IC3000)
+      when:
+        - sensor_id | length == 0
       block:
         - name: Create sensor
           ansible.builtin.uri:
@@ -75,9 +81,9 @@
             body: "{{ lookup('template', 'create_sensor_ic3000.json.j2') }}"
           register: sensor_creation_result
 
-        - name: register sensor id
-          ansible.builtin.set_fact: sensor_id="{{ sensor_creation_result['json']['Id'] }}"
-      when: sensor_id | length == 0
+        - name: Register sensor id
+          ansible.builtin.set_fact:
+            sensor_id: "{{ sensor_creation_result['json']['Id'] }}"
 
     - name: Get sensor provisioning
       ansible.builtin.uri:
@@ -125,11 +131,11 @@
         method: POST
         headers:
           X-Token-Id: "{{ auth_token }}"
-   
-    - name: pause to wait for app to stop
-      pause:
+
+    - name: Pause to wait for app to stop
+      ansible.builtin.pause:
         minutes: 1
-   
+
     - name: Activate app
       ansible.builtin.uri:
         validate_certs: false
@@ -137,9 +143,9 @@
         method: POST
         headers:
           X-Token-Id: "{{ auth_token }}"
- 
-    - name: pause to wait for app to activate
-      pause:
+
+    - name: Pause to wait for app to activate
+      ansible.builtin.pause:
         minutes: 1
 
     - name: Start app
@@ -149,4 +155,3 @@
         method: POST
         headers:
           X-Token-Id: "{{ auth_token }}"
-  when: "'IC3000' in group_names"

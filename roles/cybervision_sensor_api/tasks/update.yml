@@ -21,7 +21,8 @@
   register: app_details
 
 - name: Get app status
-  ansible.builtin.set_fact: app_status="{{ app_details.json.app_checksums.app_state }}"
+  ansible.builtin.set_fact:
+    app_status: "{{ app_details.json.app_checksums.app_state }}"
   connection: local
   when: mode == 'update'
 

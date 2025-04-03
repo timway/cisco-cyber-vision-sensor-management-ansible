@@ -9,6 +9,6 @@
   cisco.ios.ios_command:
     commands: show app-hosting list
   register: installation_status
-  until: "'DEPLOYED' in installation_status.stdout_lines[0][2]"
+  until: "'CCVSensor                                DEPLOYED' in installation_status.stdout_lines | flatten"
   retries: 35
   delay: 10

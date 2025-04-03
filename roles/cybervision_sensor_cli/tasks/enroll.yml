@@ -13,7 +13,8 @@
   notify: "Remove provisioning temporary directory"
 
 - name: Set sensor name used in Center
-  ansible.builtin.set_fact: name="{{ name | default('', true) }}"
+  ansible.builtin.set_fact:
+    name: "{{ name | default('', true) }}"
   connection: local
 
 - name: Create sensor
@@ -32,8 +33,9 @@
     - "'IC3000' not in group_names"
     - sensor_id | length == 0
 
-- name: register sensor id
-  ansible.builtin.set_fact: sensor_id="{{ sensor_creation_result['json']['Id'] }}"
+- name: Register sensor id
+  ansible.builtin.set_fact:
+    sensor_id: "{{ sensor_creation_result['json']['Id'] }}"
   connection: local
   when:
     - "'IC3000' not in group_names"
@@ -60,7 +62,8 @@
   connection: local
   cisco.ios.ios_command:
     commands:
-      - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password }}@{{ ansible_controller_ip }}//{{ sensor_provisioning_temp_dir.path }}/sbs-sensor-config-{{ serial }}.zip {{ storage }}"
+      - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password }}@{{ ansible_controller_ip }}//{{ sensor_provisioning_temp_dir.path }}/sbs-sensor-config\
+          -{{ serial }}.zip {{ storage }}"
         prompt: 'Destination filename \[sbs-sensor-config-{{ serial }}.zip\]?'
         answer: "\r"
   vars:
@@ -89,8 +92,9 @@
     - "'IC3000' in group_names"
     - sensor_id | length == 0
 
-- name: register sensor id
-  ansible.builtin.set_fact: sensor_id="{{ sensor_creation_result['json']['Id'] }}"
+- name: Register sensor id
+  ansible.builtin.set_fact:
+    sensor_id: "{{ sensor_creation_result['json']['Id'] }}"
   connection: local
   when:
     - "'IC3000' in group_names"
