@@ -57,5 +57,5 @@
   cisco.ios.ios_command:
     commands:
       - command: "delete {{ storage }}{{ application_file[0] }}"
-    prompt: 'Delete filename \[{{ application_file[0] }}\]?'
-    answer: "\r"
+        prompt: 'Delete filename \[{{ application_file[0] }}\]?'
+        answer: "\r"

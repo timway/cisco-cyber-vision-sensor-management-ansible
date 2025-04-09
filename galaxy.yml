@@ -13,6 +13,9 @@ description: >-
   security, continuity, and resilience of operations. The Ansible Playbooks
   also configure the networking device with the appropriate configuration
   needed to support the deployment of the Cyber Vision sensor.
+dependencies:
+  cisco.ios: ">=9.2.0"
+  community.general: ">=10.5.0"
 license_file: license.md
 readme: README.md
 repository: https://github.com/CiscoDevNet/cisco-cyber-vision-sensor-management-ansible

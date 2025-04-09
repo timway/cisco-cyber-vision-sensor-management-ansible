@@ -149,7 +149,7 @@
             prompt: 'Destination filename \[{{ application_file[0] }}\]?'
             answer: "\r"
       vars:
-        ansible_command_timeout: 120
+        ansible_command_timeout: 360
 
 - name: Install the app
   ansible.builtin.import_tasks: install.yml
