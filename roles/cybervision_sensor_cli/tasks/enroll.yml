@@ -1,7 +1,7 @@
 ---
 - name: Get application tar path
   ansible.builtin.set_fact:
-    tar_path: "{{ application_tar_path | regex_findall('(.*)/.*.tar$') | default('Not found') }}"
+    tar_path: "{{ cybervision_sensor_cli_app_archive | regex_findall('(.*)/.*.tar$') | default('Not found') }}"
 
 - name: Ensure a temporary directory for sensor provisioning download.
   connection: local
@@ -21,10 +21,10 @@
   connection: local
   ansible.builtin.uri:
     validate_certs: false
-    url: "{{ center_url | mandatory }}/api/3.0/sensors"
+    url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors"
     method: POST
     headers:
-      x-token-id: "{{ center_token | mandatory }}"
+      x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
     body_format: json
     return_content: true
     body: "{{ lookup('template', 'create_sensor.json.j2') }}"
@@ -49,10 +49,10 @@
   connection: local
   ansible.builtin.uri:
     validate_certs: false
-    url: "{{ center_url | mandatory }}/api/3.0/sensors/package"
+    url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors/package"
     method: POST
     headers:
-      x-token-id: "{{ center_token | mandatory }}"
+      x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
     body_format: json
     body: "{{ {'id': sensor_id} | to_json }}"
     dest: '{{ sensor_provisioning_temp_dir.path }}/sbs-sensor-config-{{ serial }}.zip'
@@ -62,7 +62,7 @@
   connection: local
   cisco.ios.ios_command:
     commands:
-      - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password }}@{{ ansible_controller_ip }}//{{ sensor_provisioning_temp_dir.path }}/sbs-sensor-config\
+      - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password }}@{{ cybervision_sensor_cli_ansible_controller }}//{{ sensor_provisioning_temp_dir.path }}/sbs-sensor-config\
           -{{ serial }}.zip {{ storage }}"
         prompt: 'Destination filename \[sbs-sensor-config-{{ serial }}.zip\]?'
         answer: "\r"
@@ -80,10 +80,10 @@
   connection: local
   ansible.builtin.uri:
     validate_certs: false
-    url: "{{ center_url | mandatory }}/api/3.0/sensors"
+    url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors"
     method: POST
     headers:
-      x-token-id: "{{ center_token | mandatory }}"
+      x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
     body_format: json
     return_content: true
     body: "{{ lookup('template', 'create_sensor_ic3k.json.j2') }}"
@@ -104,10 +104,10 @@
   connection: local
   ansible.builtin.uri:
     validate_certs: false
-    url: "{{ center_url | mandatory }}/api/3.0/sensors/package"
+    url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors/package"
     method: POST
     headers:
-      x-token-id: "{{ center_token | mandatory }}"
+      x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
     body_format: json
     return_content: true
     body: "{{ {'id': sensor_id, 'localmanager_password': iox_password} | to_json }}"

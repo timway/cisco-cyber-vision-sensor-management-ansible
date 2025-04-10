@@ -1,3 +1,6 @@
 ---
 check_sensor_and_center_version: false
 check_sensor_status: false
+
+cybervision_sensor_cli_active_discovery: false
+cybervision_sensor_cli_provision_storage: false

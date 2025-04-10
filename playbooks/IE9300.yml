@@ -6,17 +6,6 @@
   vars:
     minimum_ios_version: 17.09.01
     minimum_cvc_version: 3.2.1
-    center_url: "{{ cv_details.center_url }}"
-    application_tar_path: "{{ cv_details.application_tar_path }}"
-    cv_collection_vlan: "{{ cv_details.cv_collection_vlan }}"
-    cv_capture_vlan: "{{ cv_details.cv_capture_vlan }}"
-    cv_monitor_session_id: "{{ cv_details.monitor_session_id }}"
-    cv_monitor_session_src: "{{ cv_details.monitor_session_src }}"
-    ansible_controller_ip: "{{ cv_details.ansible_controller_ip }}"
-    cv_default_app_name: "{{ cv_details.default_app_name }}"
-    cv_deployment_method: "{{ cv_details.deployment_method }}"
-    exclusive_mode: "{{ cv_details.exclusive_mode | default(true) }}"
-    ztp_deployment: "{{ cv_details.ztp_deployment | default(false) }}"
 
   pre_tasks:
     - name: Ensure `iox` is enabled (in the configuration)
@@ -24,18 +13,6 @@
         lines:
           - iox
       diff: true
-
-    - name: Gather Cisco facts
-      cisco.ios.ios_facts:
-        gather_subset: hardware
-
-    - name: Assert that device version is greater than minimum version
-      ansible.builtin.assert:
-        that: "ansible_net_version > minimum_ios_version"
-        fail_msg: >-
-          Current version {{ ansible_net_version }} is lower than minimum requirement, Version {{ minimum_ios_version }}. Please update device firmware to
-          Version {{ minimum_ios_version }} or greater.
-        success_msg: "Current version {{ ansible_net_version }} meets minimum version requirements."
 
     - name: Detect if host needs new install or update
       block:
@@ -49,14 +26,11 @@
             mode: "{{ 'install' if 'No App found' in app_hosting_list.stdout[0] else 'update' }}"
           connection: local
 
-        - ansible.builtin.pause:
-            seconds: 45
-
     - name: Set Cyber Vision Sensor app name
       block:
         - name: For updating the app
           when:
-            - mode == 'update'
+            - mode == "update"
           block:
             - name: Get the app name for update
               ansible.builtin.set_fact:
@@ -65,17 +39,15 @@
             - name: Set app name for update
               ansible.builtin.set_fact:
                 app_name: "{{ app_list[1][0] }}"
-              connection: local
 
         - name: Set app name for install
           ansible.builtin.set_fact:
-            app_name: "{{ cv_default_app_name }}"
-          connection: local
-          when: mode == 'install'
+            app_name: "{{ cybervision_sensor_app_name }}"
+          when: mode == "install"
 
     - name: Configure for new sensor installation
       when:
-        - mode == 'install'
+        - mode == "install"
       block:
         - name: Check SD Flash presence, formatting, and partitioning for IOx
           block:
@@ -176,7 +148,7 @@
 
                 - name: Format and partition SD Flash for IOx
                   cisco.ios.ios_command:
-                    commands: 'partition sdflash: iox 73'
+                    commands: "partition sdflash: iox {{ sdflash_partition_iox_percentage | default(omit) }}"
                   when: repartition_sdflash and partition_sdflash | default(false)
 
                 - name: Assert partition operation is complete
@@ -216,11 +188,11 @@
                 save_when: changed
                 replace: block
                 before:
-                  - "no monitor session {{ cv_monitor_session_id | default('1') }} type erspan-source"
-                  - "monitor session {{ cv_monitor_session_id | default('1') }} type erspan-source"
+                  - "no monitor session {{ cybervision_sensor_cli_monitor_session_id | default('1') }} type erspan-source"
+                  - "monitor session {{ cybervision_sensor_cli_monitor_session_id | default('1') }} type erspan-source"
                 lines:
                   - no shutdown
-                  - "source {{ cv_monitor_session_src }}"
+                  - "source {{ cybervision_sensor_cli_monitor_session_src }}"
                   - destination
                   - erspan-id 2
                   - mtu 9000
@@ -230,7 +202,7 @@
           rescue:
             - name: Error while configuring monitor session
               ansible.builtin.fail:
-                msg: "The monitor session {{ cv_monitor_session_id | default('1') }} already exists"
+                msg: "The monitor session {{ cybervision_sensor_cli_monitor_session_id | default('1') }} already exists"
               ignore_errors: false
 
         - name: Configure VLANs
@@ -239,11 +211,11 @@
               cisco.ios.ios_vlans:
                 config:
                   - name: CV-Collection-VLAN
-                    vlan_id: "{{ cv_collection_vlan }}"
+                    vlan_id: "{{ cybervision_sensor_cli_collection_vlan }}"
                     state: active
                     shutdown: disabled
                   - name: CV-Capture-VLAN
-                    vlan_id: "{{ cv_capture_vlan }}"
+                    vlan_id: "{{ cybervision_sensor_cli_capture_vlan }}"
                     state: active
                     shutdown: disabled
                     remote_span: false
@@ -279,7 +251,7 @@
 
             - name: Configure sensor application
               when:
-                - cv_deployment_method == 'cli'
+                - cybervision_sensor_deployment_method == "cli"
               block:
                 - name: Clear previous sensor application payload
                   cisco.ios.ios_config:
@@ -296,7 +268,7 @@
                       - "app-hosting appid {{ app_name }}"
                     lines:
                       - app-vnic AppGigabitEthernet trunk
-                      - "vlan {{ cv_collection_vlan }} guest-interface 0"
+                      - "vlan {{ cybervision_sensor_cli_collection_vlan }} guest-interface 0"
                       - "guest-ipaddress {{ collection_address }} netmask 255.255.255.0"
                       - vlan 2508 guest-interface 1
                       - guest-ipaddress 169.254.1.2 netmask 255.255.255.0
@@ -322,8 +294,8 @@
   roles:
     - role: cybervision_sensor_api
       when:
-        - cv_deployment_method == 'api'
+        - cybervision_sensor_deployment_method == "api"
 
     - role: cybervision_sensor_cli
       when:
-        - cv_deployment_method == 'cli'
+        - cybervision_sensor_deployment_method == "cli"

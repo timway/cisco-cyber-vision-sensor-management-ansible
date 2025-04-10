@@ -6,54 +6,37 @@
   vars:
     minimum_ios_version: 17.02.01
     minimum_cvc_version: 3.2.1
-    center_url: "{{ cv_details.center_url }}"
-    application_tar_path: "{{ cv_details.application_tar_path }}"
-    cv_collection_vlan: "{{ cv_details.cv_collection_vlan }}"
-    cv_capture_vlan: "{{ cv_details.cv_capture_vlan }}"
-    cv_monitor_session_src: "{{ cv_details.monitor_session_src }}"
-    cv_monitor_session_id: "{{ cv_details.monitor_session_id }}"
-    ansible_controller_ip: "{{ cv_details.ansible_controller_ip }}"
-    cv_default_app_name: "{{ cv_details.default_app_name }}"
-    cv_deployment_method: "{{ cv_details.deployment_method }}"
-    ztp_deployment: "{{ cv_details.ztp_deployment }}"
-    exclusive_mode: "{{ cv_details.exclusive_mode }}"
-  
+
   pre_tasks:
-  - name: Gather Cisco facts
-    cisco.ios.ios_facts:
-      gather_subset: hardware
-
-  - name: Assert that device version is greater than minimum version
-    ansible.builtin.assert:
-      that: "ansible_net_version > minimum_ios_version"
-      fail_msg: "Current version {{ ansible_net_version }} is lower than minimum requirement, Version {{ minimum_ios_version }}.  Please update device firmware to Version {{ minimum_ios_version }} or greater."
-      success_msg: "Current version {{ ansible_net_version }} meets minimum version requirements."
-
   - name: Detect if host needs new install or update
     block:
       - name: Start IOx service
         cisco.ios.ios_config:
-          commands: iox
+          lines:
+            - iox
 
       - name: Verify IOx service is running
         cisco.ios.ios_command:
-          commands: show iox-service
+          commands:
+            - show iox-service
         register: iox_service
         check_mode: no
         until: 
-          - not 'Not Running' in iox_service.stdout | first
-          - not 'Not Ready' in iox_service.stdout | first
-        retries: 10
+          - not "Not Running" in iox_service.stdout | first
+          - not "Not Ready" in iox_service.stdout | first
+        retries: 12
         delay: 5
 
       - name: Show app-hosting list
         cisco.ios.ios_command:
-          commands: 'show app-hosting list'
+          commands:
+            - show app-hosting list
         register: app_hosting_list
 
-      - name: Detect install or update
-        ansible.builtin.set_fact: mode="{{ 'install' if 'No App found' in app_hosting_list.stdout[0] else 'update' }}"
-        connection: local
+      - name: Check if the app is present or not to determine 
+        ansible.builtin.set_fact:
+          mode: >-
+            {{ "install" if "No App found" in app_hosting_list.stdout[0] else "update" }}
 
   - name: Set Cyber Vision Sensor app name
     block:
@@ -64,14 +47,14 @@
               app_list: "{{ app_hosting_list.stdout_lines | regex_findall('(\\w+)\\s+(\\w+)',multiline=True) | default('No match found') }}"
 
           - name: Set app name for update
-            ansible.builtin.set_fact: app_name="{{ app_list[1][0] }}"
-            connection: local
-        when: mode == 'update'
+            ansible.builtin.set_fact:
+              app_name: "{{ app_list[1][0] }}"
+        when: mode == "update"
 
       - name: Set app name for install
-        ansible.builtin.set_fact: app_name="{{ cv_default_app_name }}"
-        connection: local
-        when: mode == 'install'
+        ansible.builtin.set_fact:
+          app_name: "{{ cybervision_sensor_app_name }}"
+        when: mode == "install"
 
   - name: Configuration for new sensor installation
     block:
@@ -194,11 +177,11 @@
             cisco.ios.ios_vlans:
               config:
                 - name: CV-Collection-VLAN
-                  vlan_id: "{{ cv_collection_vlan }}"
+                  vlan_id: "{{ cybervision_sensor_cli_collection_vlan }}"
                   state: active
                   shutdown: disabled
                 - name: CV-Capture-VLAN
-                  vlan_id: "{{ cv_capture_vlan }}"
+                  vlan_id: "{{ cybervision_sensor_cli_capture_vlan }}"
                   state: active
                   shutdown: disabled
                   remote_span: true
@@ -238,9 +221,9 @@
               save_when: changed
               replace: block
               before:
-              - no monitor session {{ cv_monitor_session_id }}
+              - no monitor session {{ cybervision_sensor_cli_monitor_session_id }}
               lines:
-              - monitor session {{ cv_monitor_session_id | default('1') }} source {{ cv_monitor_session_src }}
+              - monitor session {{ cybervision_sensor_cli_monitor_session_id | default('1') }} source {{ cybervision_sensor_cli_monitor_session_src }}
             register: monitor_session_config
 
           - name: Configure ERSPAN and destination VLAN for Monitor Session
@@ -248,8 +231,8 @@
               save_when: changed
               replace: block
               lines:
-              - monitor session {{ cv_monitor_session_id | default('1') }} destination remote vlan {{ cv_capture_vlan }}
-              - monitor session {{ cv_monitor_session_id | default('1') }} destination format-erspan 169.254.1.2
+              - monitor session {{ cybervision_sensor_cli_monitor_session_id | default('1') }} destination remote vlan {{ cybervision_sensor_cli_capture_vlan }}
+              - monitor session {{ cybervision_sensor_cli_monitor_session_id | default('1') }} destination format-erspan 169.254.1.2
             register: monitor_session_config
 
           - name: Display Applied ERSPAN Monitor Session Configuration
@@ -275,7 +258,7 @@
                 - "app-hosting appid {{ app_name }}"
               lines:
                 - app-vnic AppGigabitEthernet trunk
-                - "vlan {{ cv_collection_vlan }} guest-interface 0"
+                - "vlan {{ cybervision_sensor_cli_capture_vlan }} guest-interface 0"
                 - "guest-ipaddress {{ collection_address }} netmask 255.255.255.0"
                 - vlan 2508 guest-interface 1
                 - guest-ipaddress 169.254.1.2 netmask 255.255.255.0
@@ -296,12 +279,14 @@
               lines:
                 - guest-interface 2
             when: active_discovery_enabled is defined and active_discovery_enabled
-        when: cv_deployment_method == 'cli'
-    when: mode == 'install'
+        when: cybervision_sensor_deployment_method == "cli"
+    when: mode == "install"
 
   roles:
-  - role: cybervision_sensor_api
-    when: cv_deployment_method == 'api'
-  
-  - role: cybervision_sensor_cli
-    when: cv_deployment_method == 'cli'
+    - role: cybervision_sensor_api
+      when:
+        - cybervision_sensor_deployment_method == "api"
+
+    - role: cybervision_sensor_cli
+      when:
+        - cybervision_sensor_deployment_method == "cli"

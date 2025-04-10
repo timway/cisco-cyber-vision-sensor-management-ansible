@@ -5,8 +5,8 @@
     path: "{{ sensor_provisioning_temp_dir.path }}"
     state: absent
 
-- name: Remove app temporary directory
+- name: Remove app-hosting archive extraction tmpdir
   connection: local
   ansible.builtin.file:
-    path: "{{ app_extract_temp_dir.path }}"
+    path: "{{ _app_hosting_archive_tmpdir.path }}"
     state: absent

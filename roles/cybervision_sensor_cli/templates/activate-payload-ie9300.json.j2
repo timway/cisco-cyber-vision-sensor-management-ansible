@@ -30,7 +30,7 @@
           "vlan-id": "{{capture_vlan | default('2508')}}"
         }
       },
-      {% if (active_discovery_interfaces is defined) and (active_discovery_interfaces|length > 0) %}
+      {% if cybervision_sensor_cli_active_discovery and (cybervision_sensor_cli_active_discovery_interfaces | default([]) | length) %}
       {
         "interface-name": "eth2",
         "network-type": "bridge",

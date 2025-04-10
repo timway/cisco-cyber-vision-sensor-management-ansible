@@ -1,50 +1,85 @@
 ---
-- name: Create or verify temporary directory for app extraction
+- name: >-
+    Ensure hardware facts are gathered for all devices to perform the version
+    checks
+  cisco.ios.ios_facts:
+    gather_subset:
+      - hardware
+
+- name: Assert that device version is greater than minimum version
+  ansible.builtin.assert:
+    that:
+      - ansible_net_version > minimum_ios_version
+    fail_msg: >-
+      Current version {{ ansible_net_version }} is lower than minimum
+      requirement, version {{ minimum_ios_version }}. Please update device
+      firmware to version {{ minimum_ios_version }} or greater.
+    success_msg: >-
+      Current version {{ ansible_net_version }} meets minimum version
+      requirements.
+
+- name: >-
+    Obtain information from the app-hosting archive provided to ensure it is
+    correct for the device
   block:
-    - name: Ensure a temporary directory for app extraction
-      connection: local
+    - name: >-
+        Ensure a temporary directory exists to extract the app-hosting archive
+        into
       ansible.builtin.tempfile:
         state: directory
-        suffix: app_extract
-      register: app_extract_temp_dir
-      notify: "Remove app temporary directory"
+        suffix: app-hosting-archive
+      delegate_to: localhost
+      notify:
+        - Remove app-hosting archive extraction tmpdir
+      register: _app_hosting_archive_tmpdir
 
-    - name: Extract application
-      connection: local
+    - name: Extract the app-hosting archive to the tmpdir
       ansible.builtin.unarchive:
-        src: "{{ application_tar_path }}"
-        dest: "{{ app_extract_temp_dir.path }}"
+        dest: "{{ _app_hosting_archive_tmpdir.path }}"
+        src: "{{ cybervision_sensor_cli_app_archive }}"
+      delegate_to: localhost
+  rescue:
+    - name: Force temporary directory removal by flushing handlers
+      ansible.builtin.meta: flush_handlers
 
-    - name: Load package.yaml
-      ansible.builtin.include_vars:
-        file: "{{ app_extract_temp_dir.path }}/package.yaml"
-        name: package
+    - name: Fail out after deleting temporary files
+      ansible.builtin.fail:
+        msg: Failed to extract the app-hosting archive to the tmpdir
 
-    - name: Check app type (IC3K)
-      ansible.builtin.assert:
-        that:
-          - package.app.cpuarch == "x86_64"
-          - package.app.type == "vm"
-      when: "'ic3k' in group_names"
+- name: Load package.yaml into facts
+  ansible.builtin.set_fact:
+    _package: >-
+      {{
+        (lookup("ansible.builtin.file", _app_hosting_archive_tmpdir.path +
+        "/package.yaml") | ansible.builtin.from_yaml)
+      }}
 
-    - name: Check app type (CAT9K)
-      ansible.builtin.assert:
-        that:
-          - package.app.cpuarch == "x86_64"
-          - package.app.type == "docker"
-      when: >
-        'C9XXX' in group_names or
-        'IR8340' in group_names
+- name: Check app type (IC3K)
+  ansible.builtin.assert:
+    that:
+      - _package.app.cpuarch == "x86_64"
+      - _package.app.type == "vm"
+  when:
+    - "'IC3000' in group_names"
 
-    - name: Check app type (IR1XXX, IE3X00 and IE9300)
-      ansible.builtin.assert:
-        that:
-          - package.app.cpuarch == "aarch64"
-          - package.app.type == "docker"
-      when: >
-        'IR1XXX' in group_names or
-        'IE3X00' in group_names or
-        'IE9300' in group_names
+- name: Check app type (CAT9K)
+  ansible.builtin.assert:
+    that:
+      - _package.app.cpuarch == "x86_64"
+      - _package.app.type == "docker"
+  when: >-
+    'C9XXX' in group_names or
+    'IR8340' in group_names
+
+- name: Check app type (IR1XXX, IE3X00 and IE9300)
+  ansible.builtin.assert:
+    that:
+      - _package.app.cpuarch == "aarch64"
+      - _package.app.type == "docker"
+  when: >-
+    'IR1XXX' in group_names or
+    'IE3X00' in group_names or
+    'IE9300' in group_names
 
 - name: Verify Cyber Vision Center version
   block:
@@ -52,10 +87,10 @@
       connection: local
       ansible.builtin.uri:
         validate_certs: false
-        url: "{{ center_url | mandatory }}/api/3.0/version"
+        url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/version"
         method: GET
         headers:
-          x-token-id: "{{ center_token | mandatory }}"
+          x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
         body_format: json
       register: center_version_result
 
@@ -80,7 +115,7 @@
   block:
     - name: Register sensor version
       ansible.builtin.set_fact:
-        sensor_version: "{{ package.info.version.split('+')[0] }}"
+        sensor_version: "{{ _package.info.version.split('+')[0] }}"
       connection: local
 
     - name: Check sensor version
@@ -112,10 +147,10 @@
       connection: local
       ansible.builtin.uri:
         validate_certs: false
-        url: "{{ center_url | mandatory }}/api/3.0/sensors"
+        url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors"
         method: GET
         headers:
-          x-token-id: "{{ center_token | mandatory }}"
+          x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
         body_format: json
       register: sensor_list
 
@@ -135,7 +170,7 @@
   block:
     - name: Get the application tar file name
       ansible.builtin.set_fact:
-        application_file: "{{ application_tar_path | regex_findall('.*/(.*.tar)$') | default('Not found') }}"
+        application_file: "{{ cybervision_sensor_cli_app_archive | regex_findall('.*/(.*.tar)$') | default('Not found') }}"
 
     - name: Select storage
       ansible.builtin.set_fact:
@@ -145,7 +180,7 @@
     - name: Copy the application tar file to the device
       cisco.ios.ios_command:
         commands:
-          - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password | urlencode }}@{{ ansible_controller_ip }}/{{ application_tar_path }} {{ storage }}"
+          - command: "copy scp://{{ cv_scp_username }}:{{ cv_scp_password | urlencode }}@{{ cybervision_sensor_cli_ansible_controller }}/{{ cybervision_sensor_cli_app_archive }} {{ storage }}"
             prompt: 'Destination filename \[{{ application_file[0] }}\]?'
             answer: "\r"
       vars:
@@ -193,10 +228,10 @@
   connection: local
   ansible.builtin.uri:
     validate_certs: false
-    url: "{{ center_url | mandatory }}/api/3.0/sensors"
+    url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors"
     method: GET
     headers:
-      x-token-id: "{{ center_token | mandatory }}"
+      x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
     body_format: json
   register: sensor_list
 
@@ -216,10 +251,10 @@
   connection: local
   ansible.builtin.uri:
     validate_certs: false
-    url: "{{ center_url | mandatory }}/api/3.0/sensors"
+    url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors"
     method: GET
     headers:
-      x-token-id: "{{ center_token | mandatory }}"
+      x-token-id: "{{ cybervision_sensor_cli_center_token | mandatory }}"
     body_format: json
   register: sensor_list
 
@@ -242,7 +277,7 @@
   connection: local
   ansible.builtin.uri:
     validate_certs: false
-    url: "{{ center_url | mandatory }}/api/3.0/sensors"
+    url: "{{ cybervision_sensor_cli_center_url | mandatory }}/api/3.0/sensors"
     method: GET
     headers:
       x-token-id: "{{ center_token | mandatory }}"
